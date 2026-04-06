@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=375, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>シーリングマジック調色可能番号確認アプリ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=DM+Mono:wght@500&display=swap');
+:root{--bg:#f0f4fa;--surface:#fff;--surface2:#e8edf8;--accent:#1a5cd4;--ng:#b91c1c;--ng-bg:#fef2f2;--ng-bd:#fca5a5;--text:#1a2340;--muted:#6b7a99;--border:#d8e0f0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif}
+body{display:flex;flex-direction:column;align-items:center;padding-bottom:80px}
+.app{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;padding:0 14px;overflow:hidden}
+
+/* ヘッダー */
+.header{padding:18px 0 10px;flex-shrink:0}
+.brand{font-size:.6rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;font-weight:700}
+.title{font-size:1.05rem;font-weight:900;color:var(--text);line-height:1.2}
+.title span{color:var(--accent)}
+
+/* 入力カード */
+.input-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;flex-shrink:0;box-shadow:0 2px 8px rgba(26,92,212,.06)}
+.card-label{font-size:.62rem;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.input-row{display:flex;gap:8px}
+.color-input{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:1.1rem;font-family:'DM Mono',monospace;font-weight:500;color:var(--text);outline:none;min-height:44px;transition:border-color .2s}
+.color-input:focus{border-color:var(--accent)}
+.color-input::placeholder{color:#b0bcd4;font-size:.78rem;font-family:'Noto Sans JP',sans-serif;letter-spacing:0}
+.check-btn{background:var(--accent);border:none;border-radius:10px;padding:0 18px;min-height:44px;font-size:.9rem;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;flex-shrink:0;transition:opacity .15s,transform .1s}
+.check-btn:active{opacity:.85;transform:scale(.96)}
+.suggest-wrap{display:none;flex-wrap:wrap;gap:6px;margin-top:8px}
+.suggest-chip{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-family:'DM Mono',monospace;font-size:.82rem;color:var(--accent);cursor:pointer}
+.suggest-chip:active{background:#d0dcf8}
+
+/* スクロールエリア */
+.result-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px;padding:10px 0 8px}
+
+/* ★★★ 結果バナー（全面色表示） ★★★ */
+.result-banner{
+  border-radius:16px;
+  padding:22px 20px;
+  display:none;
+  flex-direction:column;
+  flex-shrink:0;
+  animation:popIn .25s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 4px 20px rgba(0,0,0,.15);
+  position:relative;
+  overflow:hidden;
+}
+@keyframes popIn{from{opacity:0;transform:scale(.93) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+/* 調色不可は従来通り */
+.result-banner.ng{background:var(--ng-bg);border:1.5px solid var(--ng-bd)}
+
+.banner-status{font-size:.65rem;letter-spacing:.18em;font-weight:700;text-transform:uppercase;opacity:.85;margin-bottom:4px}
+.banner-code{font-family:'DM Mono',monospace;font-size:2.2rem;font-weight:500;letter-spacing:.04em;line-height:1.1}
+.banner-msg{font-size:.8rem;margin-top:4px;opacity:.8}
+
+/* 参考色注意 */
+.banner-warn{
+  font-size:.62rem;
+  background:rgba(0,0,0,.15);
+  border-radius:6px;
+  padding:4px 9px;
+  margin-top:12px;
+  display:inline-block;
+  backdrop-filter:blur(4px);
+}
+
+/* 調色不可の近似候補 */
+.maybe-label{font-size:.6rem;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:700;margin-top:10px}
+.maybe-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.maybe-chip{background:#fff;border:1.5px solid var(--ng-bd);border-radius:8px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.maybe-chip:active{background:#fee2e2}
+.chip-swatch{width:22px;height:22px;border-radius:5px;flex-shrink:0;border:1px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.chip-code{font-family:'DM Mono',monospace;font-size:.85rem;font-weight:500;color:var(--ng)}
+.chip-reason{font-size:.58rem;color:#e06060}
+
+/* 一覧固定ボタン */
+.list-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(240,244,250,.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--border);z-index:50}
+.list-btn{display:block;width:100%;max-width:480px;margin:0 auto;background:var(--accent);border:none;border-radius:12px;padding:14px 0;font-size:1rem;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.04em;box-shadow:0 4px 14px rgba(26,92,212,.4);transition:opacity .15s,transform .1s}
+.list-btn:active{opacity:.85;transform:scale(.98)}
+
+/* オーバーレイ一覧 */
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#f0f4fa;z-index:100;flex-direction:column}
+.overlay.show{display:flex}
+.overlay-header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #d8e0f0;flex-shrink:0}
+.overlay-title{font-size:.9rem;font-weight:900;color:#1a2340}
+.overlay-title span{color:#1a5cd4}
+.close-btn{background:none;border:none;font-size:1.4rem;color:#6b7a99;cursor:pointer;padding:4px 8px;line-height:1}
+.list-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}
+.list-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.list-table tr{border-bottom:1px solid #e8edf8}
+.list-table tr:last-child{border-bottom:none}
+.list-table td{padding:8px 10px;vertical-align:middle}
+.list-grp{font-weight:700;color:#1a5cd4;font-size:.82rem;white-space:nowrap;width:32px}
+.list-chips{display:flex;flex-wrap:wrap;gap:5px}
+.list-chip{
+  display:inline-block;
+  border-radius:8px;
+  padding:6px 11px;
+  font-size:.75rem;
+  font-family:'DM Mono',monospace;
+  font-weight:500;
+  cursor:pointer;
+  border:1px solid rgba(0,0,0,.08);
+  box-shadow:0 1px 3px rgba(0,0,0,.1);
+  transition:transform .1s,opacity .1s;
+}
+.list-chip:active{transform:scale(.95);opacity:.85}
+.list-count{font-size:.65rem;color:#b0bcd4;text-align:right;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="brand">Sealing Magic</div>
+    <div class="title">シーリングマジック<span>調色可能番号確認アプリ</span></div>
+  </div>
+  <div class="input-card">
+    <div class="card-label">色番号を入力</div>
+    <div class="input-row">
+      <input class="color-input" id="colorInput" placeholder="例：19-80D　N-75　90" maxlength="10"
+        oninput="onInput()" onkeydown="if(event.key==='Enter')checkColor()"
+        autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <button class="check-btn" onclick="checkColor()">確認</button>
+    </div>
+    <div class="suggest-wrap" id="suggestWrap"></div>
+  </div>
+  <div class="result-area">
+    <div class="result-banner" id="resultBanner"></div>
+  </div>
+</div>
+
+<div class="list-bar">
+  <button class="list-btn" onclick="openList()">📋 調色可能番号 一覧を確認する</button>
+</div>
+
+<div class="overlay" id="listOverlay">
+  <div class="overlay-header">
+    <div class="overlay-title">シーリングマジック <span>調色可能番号一覧</span></div>
+    <button class="close-btn" onclick="closeList()">✕</button>
+  </div>
+  <div class="list-body">
+    <table class="list-table" id="listTable"></table>
+    <div class="list-count" id="listCount"></div>
+  </div>
+</div>
+
+<script>
+const COLORS=["02-60H","02-60L","02-70L","02-80H","02-80L","02-90D","05-50D","05-60B","05-60D","05-60F","05-60L","05-70A","05-70B","05-70D","05-70L","05-75A","05-75B","05-80A","05-80B","05-80D","05-85A","05-85B","05-90A","05-90B","05-90D","05-92B","07-60H","07-70F","07-70L","07-80H","07-90D","09-60B","09-60D","09-70D","09-70H","09-80D","09-80F","09-90D","12-60D","12-70D","12-80F","12-80H","12-90D","15-50B","15-60B","15-60D","15-65A","15-65B","15-70A","15-70B","15-70D","15-70H","15-75A","15-75B","15-80A","15-80B","15-80D","15-80F","15-85A","15-85B","15-90A","15-90B","15-90D","15-92B","17-60B","17-60C","17-60D","17-70B","17-70C","17-70D","17-70F","17-70H","17-80A","17-80B","17-80C","17-80D","17-80F","17-80H","17-90A","17-90B","17-90D","19-50A","19-60A","19-60B","19-60C","19-60D","19-65A","19-65B","19-65D","19-70A","19-70B","19-70C","19-70D","19-70F","19-75A","19-75B","19-75C","19-75D","19-75L","19-80A","19-80B","19-80C","19-80D","19-80F","19-80L","19-85A","19-85B","19-85C","19-85D","19-85F","19-90A","19-90B","19-90C","19-90D","19-90F","19-92B","22-60B","22-60C","22-60D","22-65A","22-65C","22-70A","22-70B","22-70C","22-70D","22-70H","22-75A","22-75B","22-75C","22-75D","22-75F","22-80A","22-80B","22-80C","22-80D","22-80F","22-80H","22-85A","22-85B","22-85C","22-85D","22-85F","22-85H","22-87C","22-90A","22-90B","22-90C","22-90D","22-90H","25-50A","25-60A","25-60B","25-60D","25-65A","25-65B","25-70A","25-70B","25-70C","25-70D","25-75A","25-75B","25-75C","25-80A","25-80B","25-80C","25-80D","25-80H","25-85A","25-85B","25-85C","25-85D","25-85F","25-90A","25-90B","25-90C","25-90D","25-90H","25-92B","27-60D","27-70D","27-80B","27-85B","27-85H","27-90B","27-90F","29-60D","29-70B","29-75H","29-80B","29-80H","29-85B","29-90B","29-90H","29-92B","32-60D","32-80D","32-80H","32-90D","35-50B","35-60B","35-60D","35-65A","35-70A","35-70B","35-70D","35-70H","35-75A","35-80A","35-80B","35-80D","35-80H","35-85A","35-85B","35-90A","35-90B","35-90D","35-92B","37-60D","37-70H","37-80D","37-80H","37-90D","39-70H","39-80B","39-80D","39-80H","42-70D","42-70H","42-80D","42-90D","45-50B","45-60B","45-60D","45-65A","45-70A","45-70B","45-70D","45-70H","45-75A","45-80A","45-80B","45-80D","45-80H","45-85A","45-85B","45-90A","45-90B","45-90D","45-92B","49-70H","49-80H","52-60H","52-60L","52-70D","52-70L","52-90D","55-50B","55-60B","55-60D","55-70A","55-70B","55-70D","55-70H","55-70P","55-75A","55-80A","55-80B","55-80D","55-80H","55-85A","55-85B","55-90A","55-90B","55-90D","57-60C","57-70D","57-70H","57-80D","57-90D","59-50D","59-60H","59-60P","59-70L","59-80B","59-80D","62-50H","62-60D","62-60H","62-60L","62-70H","62-80H","65-50A","65-50B","65-50D","65-60A","65-60B","65-60D","65-60P","65-65A","65-70A","65-70B","65-70D","65-70H","65-70L","65-75A","65-80A","65-80B","65-80D","65-80H","65-85A","65-85B","65-90A","65-90B","65-90D","67-70L","67-80H","69-40D","69-50D","69-60H","69-60L","69-60T","69-70L","69-70P","69-80B","69-80D","69-80H","72-50L","72-50P","72-60D","72-60H","72-70D","72-70L","72-80D","72-80H","75-40B","75-40D","75-40H","75-50B","75-50C","75-50D","75-50H","75-60B","75-60D","75-60P","75-70A","75-70B","75-70D","75-70L","75-75A","75-80A","75-80B","75-80D","75-80H","75-85A","75-85B","75-90A","75-90B","75-90D","76-50L","76-50T","76-60P","76-70L","76-80D","76-80H","77-50L","77-50T","77-60L","77-60P","77-70D","77-70H","79-70L","82-50D","82-50H","82-50L","82-60H","82-70H","82-80D","85-50B","85-50D","85-50P","85-60B","85-60D","85-60H","85-65A","85-70A","85-70B","85-70D","85-70H","85-70L","85-75A","85-80A","85-80B","85-80D","85-80H","85-85A","85-85B","85-90A","85-90B","85-90D","85-92B","87-50D","87-60H","87-60L","87-70D","87-70H","87-80D","89-70H","92-50H","92-60P","92-70L","92-80D","92-80H","95-50B","95-50D","95-60B","95-60D","95-70A","95-70B","95-70D","95-70H","95-70L","95-75A","95-80A","95-80B","95-80D","95-80L","95-85A","95-85B","95-90A","95-90B","95-90D","97-70P","99-60H","99-60L","99-70D","99-70H","99-70L","99-80B","N-45","N-50","N-55","N-60","N-65","N-67","N-70","N-72","N-75","N-77","N-80","N-82","N-85","N-87","N-90","N-93"];
+
+const COLOR_RGB={"02-60H":"#c1858c","02-60L":"#cd8087","02-70L":"#f0979f","02-80H":"#ffb5be","02-80L":"#ffaeb7","02-90D":"#ffd8e4","05-50D":"#8e7578","05-60B":"#9f9198","05-60D":"#ac8e92","05-60F":"#b28c8f","05-60L":"#c68481","05-70A":"#b7acb5","05-70B":"#bbabb3","05-70D":"#caa7ac","05-70L":"#e89c98","05-75A":"#c5b9c3","05-75B":"#cab8c1","05-80A":"#d3c7d1","05-80B":"#d8c5cf","05-80D":"#e8c0c6","05-85A":"#e1d4df","05-85B":"#e6d3dc","05-90A":"#f0e1ed","05-90B":"#f5e0eb","05-90D":"#ffdae1","05-92B":"#fbe5f0","07-60H":"#b88a86","07-70F":"#cda6a6","07-70L":"#e29f94","07-80H":"#f9bbb6","07-90D":"#ffdcdf","09-60B":"#9e9298","09-60D":"#a78f90","09-70D":"#c5a9a9","09-70H":"#d3a59b","09-80D":"#e3c3c3","09-80F":"#e8c1be","09-90D":"#ffddde","12-60D":"#a4918f","12-70D":"#c0aba8","12-80F":"#e2c4bc","12-80H":"#eac2b0","12-90D":"#fbdfdc","15-50B":"#80797d","15-60B":"#9b9397","15-60D":"#9f938e","15-65A":"#a7a0a7","15-65B":"#a8a0a4","15-70A":"#b5adb4","15-70B":"#b6adb2","15-70D":"#bbaca7","15-70H":"#c2ac97","15-75A":"#c2bac2","15-75B":"#c4babf","15-80A":"#d0c8d0","15-80B":"#d2c7cd","15-80D":"#d8c7c1","15-80F":"#dac6bb","15-85A":"#ded5de","15-85B":"#e0d5db","15-90A":"#ece3ec","15-90B":"#eee2e8","15-90D":"#f5e2db","15-92B":"#f4e8ee","17-60B":"#9a9397","17-60C":"#9b9392","17-60D":"#9c948e","17-70B":"#b5adb2","17-70C":"#b6aeac","17-70D":"#b8aea7","17-70F":"#b9aea2","17-70H":"#bbae97","17-80A":"#cfc8d0","17-80B":"#d0c8cd","17-80C":"#d2c8c7","17-80D":"#d3c8c0","17-80F":"#d5c8ba","17-80H":"#d8c8ae","17-90A":"#ece3ec","17-90B":"#ece3e8","17-90D":"#f0e3db","19-50A":"#7e7a7e","19-60A":"#999399","19-60B":"#999497","19-60C":"#999492","19-60D":"#99958e","19-65A":"#a6a1a7","19-65B":"#a6a1a4","19-65D":"#a6a29a","19-70A":"#b3aeb4","19-70B":"#b4aeb2","19-70C":"#b4aeac","19-70D":"#b4afa7","19-70F":"#b4afa2","19-75A":"#c1bbc2","19-75B":"#c1bbbf","19-75C":"#c1bcb9","19-75D":"#c2bcb4","19-75L":"#c2be98","19-80A":"#cfc8d0","19-80B":"#cfc8cd","19-80C":"#cfc9c7","19-80D":"#cfc9c1","19-80F":"#cfcabb","19-80L":"#d0cca3","19-85A":"#ddd5de","19-85B":"#ddd6da","19-85C":"#ddd6d4","19-85D":"#ddd7ce","19-85F":"#ddd7c7","19-90A":"#ebe3ec","19-90B":"#ebe3e8","19-90C":"#ebe4e1","19-90D":"#ebe5db","19-90F":"#ece5d4","19-92B":"#f1e9ee","22-60B":"#979497","22-60C":"#959593","22-60D":"#94968e","22-65A":"#a5a1a7","22-65C":"#a3a2a0","22-70A":"#b2aeb4","22-70B":"#b2aeb2","22-70C":"#b0afad","22-70D":"#aeb0a8","22-70H":"#aab399","22-75A":"#c0bbc2","22-75B":"#bfbcbf","22-75C":"#bdbdba","22-75D":"#bcbeb4","22-75F":"#babfaf","22-80A":"#cec8d0","22-80B":"#cdc9cd","22-80C":"#cbcac7","22-80D":"#c9cbc1","22-80F":"#c7ccbb","22-80H":"#c4ceb0","22-85A":"#dbd6de","22-85B":"#dad7db","22-85C":"#d8d8d4","22-85D":"#d6d9ce","22-85F":"#d4dac8","22-85H":"#d1dcbc","22-87C":"#deddda","22-90A":"#e9e4ec","22-90B":"#e8e4e9","22-90C":"#e6e6e2","22-90D":"#e4e7db","22-90H":"#deeac8","25-50A":"#7c7a7f","25-60A":"#979499","25-60B":"#959597","25-60D":"#8f978f","25-65A":"#a4a1a7","25-65B":"#a2a2a5","25-70A":"#b2aeb5","25-70B":"#b0afb2","25-70C":"#acb1ad","25-70D":"#a9b2a9","25-75A":"#bfbbc2","25-75B":"#bdbcc0","25-75C":"#b9beba","25-80A":"#cdc9d0","25-80B":"#cacacd","25-80C":"#c6cbc8","25-80D":"#c2cdc2","25-80H":"#b7d1b3","25-85A":"#dad6de","25-85B":"#d8d7db","25-85C":"#d4d9d5","25-85D":"#cfdbcf","25-85F":"#cbdcca","25-90A":"#e8e4ec","25-90B":"#e6e5e9","25-90C":"#e1e7e3","25-90D":"#dde9dd","25-90H":"#d0eecb","25-92B":"#ebeaef","27-60D":"#8c9890","27-70D":"#a5b3aa","27-80B":"#c9cace","27-85B":"#d7d8db","27-85H":"#bae1c1","27-90B":"#e4e5e9","27-90F":"#d2ecd8","29-60D":"#899991","29-70B":"#adb0b3","29-75H":"#9ac7ab","29-80B":"#c8cace","29-80H":"#a5d5b8","29-85B":"#d5d8dc","29-90B":"#e3e6ea","29-90H":"#bcf2d1","29-92B":"#e8ebf0","32-60D":"#859a93","32-80D":"#b4d0c7","32-80H":"#98d7bc","32-90D":"#cdece2","35-50B":"#777c7f","35-60B":"#919699","35-60D":"#819a95","35-65A":"#a2a2a8","35-70A":"#afafb6","35-70B":"#aab0b4","35-70D":"#98b6af","35-70H":"#79bda8","35-75A":"#bcbcc3","35-80A":"#cac9d1","35-80B":"#c4cbd0","35-80D":"#afd1ca","35-80H":"#8cd9c2","35-85A":"#d7d7df","35-85B":"#d2d9de","35-90A":"#e5e5ee","35-90B":"#dfe7ec","35-90D":"#c7ede5","35-92B":"#e4ecf2","37-60D":"#7f9b96","37-70H":"#72bdac","37-80D":"#acd2cc","37-80H":"#84dac6","37-90D":"#c4eee8","39-70H":"#6bbeaf","39-80B":"#c3cbd1","39-80D":"#aad2ce","39-80H":"#7cdbca","42-70D":"#91b7b6","42-70H":"#64bfb5","42-80D":"#a7d2d1","42-90D":"#beefee","45-50B":"#767c81","45-60B":"#8f969c","45-60D":"#7a9b9d","45-65A":"#a1a2aa","45-70A":"#aeafb7","45-70B":"#a8b1b8","45-70D":"#90b6b9","45-70H":"#5fbfba","45-75A":"#bbbcc5","45-80A":"#c8cad3","45-80B":"#c2cbd3","45-80D":"#a6d2d5","45-80H":"#6fdbd7","45-85A":"#d6d7e1","45-85B":"#cfd9e2","45-90A":"#e4e5f0","45-90B":"#dce7f0","45-90D":"#bdeff1","45-92B":"#e2ecf6","49-70H":"#60bec2","49-80H":"#6fdadf","52-60H":"#56a0aa","52-60L":"#23a4ae","52-70D":"#93b5bf","52-70L":"#2ac1cc","52-90D":"#c1edfa","55-50B":"#787b83","55-60B":"#91959f","55-60D":"#8099a5","55-70A":"#afaeb9","55-70B":"#abb0bb","55-70D":"#97b4c2","55-70H":"#6fbacc","55-70P":"#00c3da","55-75A":"#bcbcc7","55-80A":"#cac9d5","55-80B":"#c5cad7","55-80D":"#aecfdf","55-80H":"#81d7eb","55-85A":"#d7d7e3","55-85B":"#d2d8e5","55-90A":"#e5e4f2","55-90B":"#dfe6f4","55-90D":"#c6ebfd","57-60C":"#8b96a3","57-70D":"#9ab3c3","57-70H":"#78b9cf","57-80D":"#b2cee1","57-90D":"#caeaff","59-50D":"#6e7d8a","59-60H":"#6d9bb3","59-60P":"#2da1c2","59-70L":"#65badb","59-80B":"#c7c9d8","59-80D":"#b6cde2","62-50H":"#647e96","62-60D":"#8b96a9","62-60H":"#7998b6","62-60L":"#6a9abe","62-70H":"#8fb3d5","62-80H":"#a5cff5","65-50A":"#7d7a82","65-50B":"#7c7a84","65-50D":"#777a8c","65-60A":"#97939e","65-60B":"#9694a0","65-60D":"#9094a9","65-60P":"#7497cb","65-65A":"#a5a0ac","65-70A":"#b2adba","65-70B":"#b0aebc","65-70D":"#aaaec7","65-70H":"#9eafd8","65-70L":"#95b0e3","65-75A":"#bfbbc8","65-80A":"#cdc8d6","65-80B":"#cbc8d9","65-80D":"#c4c9e5","65-80H":"#b7caf8","65-85A":"#dbd5e4","65-85B":"#d9d6e7","65-90A":"#e9e3f3","65-90B":"#e7e3f6","65-90D":"#dee4ff","67-70L":"#a3ace4","67-80H":"#c2c7f9","69-40D":"#635f6f","69-50D":"#7d788c","69-60H":"#9790b9","69-60L":"#978fc3","69-60T":"#958bda","69-70L":"#b1a8e5","69-70P":"#b1a6f2","69-80B":"#cec7d9","69-80D":"#cec6e6","69-80H":"#cdc4f9","72-50L":"#8a71a1","72-50P":"#8e6eab","72-60D":"#9d90aa","72-60H":"#a38cb8","72-70D":"#b9aac7","72-70L":"#c4a1e5","72-80D":"#d5c4e5","72-80H":"#ddbef9","75-40B":"#665f69","75-40D":"#6a5d6f","75-40H":"#725978","75-50B":"#817884","75-50C":"#837788","75-50D":"#86758b","75-50H":"#8f7097","75-60B":"#9c92a0","75-60D":"#a28ea9","75-60P":"#be7dcc","75-70A":"#b5acb9","75-70B":"#b7acbc","75-70D":"#bfa8c6","75-70L":"#d59be2","75-75A":"#c3bac7","75-80A":"#d1c7d6","75-80B":"#d3c6d8","75-80D":"#dcc1e4","75-80H":"#ebb9f7","75-85A":"#dfd4e4","75-85B":"#e1d3e7","75-90A":"#ede2f2","75-90B":"#efe1f6","75-90D":"#fadcff","76-50L":"#9a6b9f","76-50T":"#ab5eb1","76-60P":"#c47bcb","76-70L":"#da99e1","76-80D":"#dec1e4","76-80H":"#efb8f6","77-50L":"#9d699e","77-50T":"#b05ab0","77-60L":"#be80bf","77-60P":"#c978c9","77-70D":"#c3a7c5","77-70H":"#d39ed5","79-70L":"#e793dd","82-50D":"#8e7388","82-50H":"#9f6a91","82-50L":"#aa6397","82-60H":"#c081af","82-70H":"#e198ce","82-80D":"#e9bddf","85-50B":"#847782","85-50D":"#917286","85-50P":"#bc5797","85-60B":"#a0919e","85-60D":"#af8aa3","85-60H":"#c57fab","85-65A":"#aa9fab","85-70A":"#b8acb8","85-70B":"#bcaaba","85-70D":"#cda3bf","85-70H":"#e796c9","85-70L":"#f88bcf","85-75A":"#c6b9c6","85-80A":"#d4c6d4","85-80B":"#d9c4d6","85-80D":"#ecbcdc","85-80H":"#ffade7","85-85A":"#e2d3e3","85-85B":"#e7d1e4","85-90A":"#f0e1f1","85-90B":"#f6dff3","85-90D":"#ffd6fa","85-92B":"#fce4f9","87-50D":"#927285","87-60H":"#c77fa7","87-60L":"#d675ac","87-70D":"#cfa3bd","87-70H":"#ea95c5","87-80D":"#eebcda","89-70H":"#eb95c0","92-50H":"#a76882","92-60P":"#e76b9f","92-70L":"#fe8bba","92-80D":"#f1bbd4","92-80H":"#ffadd6","95-50B":"#857780","95-50D":"#93727f","95-60B":"#a1909b","95-60D":"#b28a9a","95-70A":"#b9acb7","95-70B":"#beaab6","95-70D":"#d1a3b5","95-70H":"#eb97b2","95-70L":"#fb8eb0","95-75A":"#c7b9c4","95-80A":"#d5c6d2","95-80B":"#dac4d2","95-80D":"#f0bcd0","95-80L":"#ffa4cb","95-85A":"#e3d3e0","95-85B":"#e9d1e0","95-90A":"#f1e1ef","95-90B":"#f8dfee","95-90D":"#ffd6ec","97-70P":"#ff88a6","99-60H":"#c48390","99-60L":"#d17d8b","99-70D":"#cfa4b0","99-70H":"#e69ba9","99-70L":"#f494a4","99-80B":"#dac4d0","N-45":"#716d73","N-50":"#7e7980","N-55":"#8b868e","N-60":"#98939c","N-65":"#a6a0a9","N-67":"#aba5af","N-70":"#b3adb7","N-72":"#b9b3bd","N-75":"#c1bac5","N-77":"#c6c0ca","N-80":"#cfc8d3","N-82":"#d4cdd8","N-85":"#dcd5e1","N-87":"#e2dbe7","N-90":"#ebe3ef","N-93":"#f3ebf8"};
+
+const colorMap=new Map(COLORS.map(c=>[c.replace(/-/g,'').toUpperCase(),c]));
+function lookup(v){if(!v)return null;return colorMap.get(v)||colorMap.get('N'+v)||null}
+function normalize(s){return s.toUpperCase().replace(/[Ａ-Ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/-/g,'').trim()}
+function getHex(code){return COLOR_RGB[code]||null}
+
+// 背景色に対して読みやすい文字色（白 or 黒）を自動選択
+function textColor(hex){
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  // WCAG相対輝度
+  const lum=0.2126*r/255+0.7152*g/255+0.0722*b/255;
+  return lum>0.45?'#1a2340':'#ffffff';
+}
+
+function onInput(){
+  const val=normalize(document.getElementById('colorInput').value);
+  const wrap=document.getElementById('suggestWrap');
+  if(val.length<2||lookup(val)){wrap.style.display='none';return}
+  const hits=COLORS.filter(c=>c.replace(/-/g,'').toUpperCase().startsWith(val)&&c.replace(/-/g,'').toUpperCase()!==val).slice(0,6);
+  if(!hits.length){wrap.style.display='none';return}
+  wrap.innerHTML=hits.map(m=>`<span class="suggest-chip" onclick="pick('${m}')">${m}</span>`).join('');
+  wrap.style.display='flex';
+}
+
+function pick(code){
+  document.getElementById('colorInput').value=code;
+  document.getElementById('suggestWrap').style.display='none';
+  checkColor();
+}
+
+function checkColor(){
+  const val=normalize(document.getElementById('colorInput').value);
+  const banner=document.getElementById('resultBanner');
+  document.getElementById('suggestWrap').style.display='none';
+  if(!val){banner.style.display='none';return}
+
+  const matched=lookup(val);
+  banner.style.display='none';void banner.offsetWidth;banner.style.display='flex';
+
+  if(matched){
+    const hex=getHex(matched);
+    const fg=hex?textColor(hex):'#1a2340';
+    const bgStyle=hex?`background:${hex};border:none;`:'background:#ecfdf5;border:1.5px solid #6ee7b7;';
+    const warnStyle=`background:rgba(${fg==='#ffffff'?'255,255,255':'0,0,0'},.15);color:${fg};`;
+
+    banner.className='result-banner ok';
+    banner.style.cssText=bgStyle;
+    banner.innerHTML=`
+      <div class="banner-status" style="color:${fg}">✓ 調色可能</div>
+      <div class="banner-code" style="color:${fg}">${matched}</div>
+      <div class="banner-msg" style="color:${fg}">シーリングマジックで調色できます</div>
+      ${hex?`<div class="banner-warn" style="${warnStyle}">⚠️ 参考色表示（実際の塗料色とは異なります）</div>`:''}
+    `;
+  }else{
+    banner.className='result-banner ng';
+    banner.style.cssText='';
+    const sugg=getSuggestions(val);
+    const maybeHtml=sugg.length?`
+      <div class="maybe-label">近似色の候補</div>
+      <div class="maybe-chips">${sugg.map(({code,reason})=>{
+        const h=getHex(code);
+        return`<span class="maybe-chip" onclick="pick('${code}')">
+          ${h?`<span class="chip-swatch" style="background:${h}"></span>`:''}
+          <span><span class="chip-code">${code}</span><br><span class="chip-reason">${reason}</span></span>
+        </span>`;
+      }).join('')}</div>`:'';
+    banner.innerHTML=`
+      <div class="banner-status" style="color:var(--ng)">✗ 調色不可</div>
+      <div class="banner-code" style="color:var(--ng)">${val}</div>
+      <div class="banner-msg" style="color:var(--muted)">この番号は調色対象外です</div>
+      ${maybeHtml}
+    `;
+  }
+  setTimeout(()=>banner.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+}
+
+function getSuggestions(val){
+  const ev=/^\d+$/.test(val)?'N'+val:val;
+  const m=ev.match(/^([A-Z]*)(\d+)([A-Z]*)$/);
+  const seen=new Set();const res=[];
+  const add=(c,r)=>{if(!seen.has(c)){seen.add(c);res.push({code:c,reason:r})}};
+  if(m){
+    const[,pre,ns,suf]=m;const num=parseInt(ns);
+    COLORS.forEach(c=>{const k=c.replace(/-/g,'').toUpperCase();const cm=k.match(/^([A-Z]*)(\d+)([A-Z]*)$/);if(cm&&cm[1]===pre&&cm[2]===ns&&cm[3]!==suf)add(c,'同番号・別グレード')});
+    COLORS.map(c=>{const k=c.replace(/-/g,'').toUpperCase();const cm=k.match(/^([A-Z]*)(\d+)([A-Z]*)$/);return cm?{c,pre:cm[1],num:parseInt(cm[2]),suf:cm[3]}:null}).filter(x=>x&&x.pre===pre&&x.suf===suf&&x.num!==num).sort((a,b)=>Math.abs(a.num-num)-Math.abs(b.num-num)).forEach(x=>add(x.c,`数字近似(±${Math.abs(x.num-num)})`));
+  }else{COLORS.forEach(c=>{if(c.replace(/-/g,'').toUpperCase().includes(val))add(c,'部分一致')})}
+  return res.slice(0,5);
+}
+
+function openList(){
+  const groups={};
+  COLORS.forEach(c=>{const key=c.startsWith('N')?'N系':c.split('-')[0];if(!groups[key])groups[key]=[];groups[key].push(c)});
+  const keys=Object.keys(groups).sort((a,b)=>{if(a==='N系')return 1;if(b==='N系')return -1;return parseInt(a)-parseInt(b)});
+  const rows=keys.map(key=>{
+    const label=key==='N系'?'N':key;
+    const chips=groups[key].map(c=>{
+      const h=getHex(c);
+      const fg=h?textColor(h):'#1a2340';
+      const bg=h||'#eef2fb';
+      return`<span class="list-chip" style="background:${bg};color:${fg}" onclick="pickFromList('${c}')">${c}</span>`;
+    }).join('');
+    return`<tr><td class="list-grp">${label}</td><td><div class="list-chips">${chips}</div></td></tr>`;
+  }).join('');
+  document.getElementById('listTable').innerHTML=rows;
+  document.getElementById('listCount').textContent='全'+COLORS.length+'色';
+  document.getElementById('listOverlay').classList.add('show');
+}
+function pickFromList(code){closeList();document.getElementById('colorInput').value=code;checkColor()}
+function closeList(){document.getElementById('listOverlay').classList.remove('show')}
+</script>
+</body>
+</html>
